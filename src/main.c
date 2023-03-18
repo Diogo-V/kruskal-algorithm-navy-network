@@ -41,8 +41,8 @@ typedef struct node {
  * @param status signals us if the highway has been built or is still pending
  */
 typedef struct highway {
-  struct node* city_1;
-  struct node* city_2;
+  struct node city_1;
+  struct node city_2;
   int cost;
   BuildStatus status;
 } *Highway;
@@ -51,7 +51,7 @@ typedef struct highway {
  * @brief City configuration that can be turned into a graph.
  * 
  * @param highways linked list of highways that can be built
- * @param port_cost cost of building a port (-1 if no port can be built)
+ * @param port_cost cost of building a port (0 if no port can be built)
  * @param n_highways number of highways that can be built to this city
  */
 typedef struct city {
@@ -112,8 +112,8 @@ void debug_print_cities() {
     printf("City %d: port_cost %d | n_highways %d\n", i, cities[i].port_cost, cities[i].n_highways);
   }
   for (k = 0; k < n_highways; k++) {
-    printf("Highway %d: c1 %d | c2 %d | cost %d | status %d", k, 
-      highways[k].city_1->id, highways[k].city_2->id, highways[k].cost, highways[k].status);
+    printf("Highway %d: c1 %d | c2 %d | cost %d | status %d\n", k,
+      highways[k].city_1.id, highways[k].city_2.id, highways[k].cost, highways[k].status);
   }
 }
 
@@ -127,10 +127,10 @@ void debug_print_cities() {
  */
 Node get_city_highway_node(City city, Highway highway) {
   int city_index = ptr_to_loc(city);
-  if (city_index == highway->city_1->id) {
-    return highway->city_1;
+  if (city_index == highway->city_1.id) {
+    return &highway->city_1;
   } else {
-    return highway->city_2;
+    return &highway->city_2;
   }
 }
 
@@ -140,7 +140,7 @@ Node get_city_highway_node(City city, Highway highway) {
  * @param city city id that is going to holds this highway
  * @param highway highway reference
  */
-void insert_highway(int city, Highway highway) {
+void insert_highway(City city, Highway highway) {
   Node node = get_city_highway_node(city, highway);
 
   /* If this is the first highway being added, we just need to update all pointers */
@@ -151,9 +151,19 @@ void insert_highway(int city, Highway highway) {
     return;
   }
 
-  /* Since it is not the first highway that has been added to this city, we have to append it */
+  /* When we only have one highway, we should just connect both */
   Node city_node = get_city_highway_node(city, city->highways);
+  if (city->n_highways == 1) {
+    city_node->next = highway;
+    city_node->previous = highway;
+    node->next = city->highways;
+    node->previous = city->highways;
+    return;
+  }
+
+  /* Since it is not the first highway that has been added to this city, we have to append it */
   Node last_node = get_city_highway_node(city, city_node->previous);
+
   node->next = city->highways;
   node->previous = city_node->previous;
   last_node->next = highway;
@@ -168,16 +178,14 @@ void insert_highway(int city, Highway highway) {
  * @param cost cost of building the highway
  * @param index index of the highway in the highways object
  */
-void build_highway(int city_1, int city_2, int cost, int index) {
-  Highway h = &highways[index];
-
+void build_highway(int city_1, int city_2, int cost, Highway h) {
   /* Saves cities identifiers*/
-  h->city_1->id = city_1;
-  h->city_2->id = city_2;
+  h->city_1.id = city_1;
+  h->city_2.id = city_2;
 
   /* Inserts highway in both cities's linked list of highways */
-  insert_highway(city_1, h);
-  insert_highway(city_2, h);
+  insert_highway(&cities[city_1], h);
+  insert_highway(&cities[city_2], h);
 
   /* Updates number of highways that can be built in both cities */
   cities[city_1].n_highways++;
@@ -217,11 +225,6 @@ void build_cities() {
     cities[city_1].port_cost = cost;
   }
 
-  /* Cities that do not have ports, will have their port_cost set to -1 */
-  for (i = city_1; i < n_cities; i++) {
-    cities[i + 1].port_cost = -1;
-  }
-
   /* Reads max number of highways that can be built and builds struct for it */
   scanf("%d", &n_highways);
   highways = (Highway) calloc(n_highways, sizeof(struct highway));
@@ -229,7 +232,7 @@ void build_cities() {
   /* Inserts highways in the struct and connects them to the cities */
   for (i = 0, city_1 = 0; i < n_highways; i++) {
     scanf("%d %d %d", &city_1, &city_2, &cost);
-    build_highway(city_1, city_2, cost, i);
+    build_highway(city_1, city_2, cost, &highways[i]);
   }
 }
 

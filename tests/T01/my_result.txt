@@ -1,0 +1,8 @@
+City 1: port_cost 1 | n_highways 2
+City 2: port_cost 5 | n_highways 2
+City 3: port_cost 1 | n_highways 2
+City 4: port_cost 0 | n_highways 2
+Highway 0: c1 1 | c2 2 | cost 1 | status 0
+Highway 1: c1 1 | c2 3 | cost 6 | status 0
+Highway 2: c1 2 | c2 4 | cost 2 | status 0
+Highway 3: c1 3 | c2 4 | cost 3 | status 0

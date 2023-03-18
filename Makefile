@@ -36,7 +36,7 @@ t4:
 	@diff ./tests/T04/output.txt ./tests/T04/my_result.txt
 
 # Runs valgrind instance
-v:
+valgrind:
 	@docker run --platform linux/amd64 -tiv "$(PWD)/.:/valgrind" karek/valgrind:latest
 
 # Cleans binaries
