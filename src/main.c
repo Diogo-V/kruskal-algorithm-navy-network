@@ -198,11 +198,6 @@ void boruvka_mst() {
   /* While cities are not totally connected, we need to find the cheapest highways to connect them */
   while (n_city_components > 1) {
 
-    /* Resets all highways to be -1 */
-    for (i = 0; i < n_cities; i++) {
-      cities[i].cheapest = NULL;
-    }
-
     /* Loops over all possible highways that can be built to connect the city and chooses the cheapest
      * for each of the city components that are not yet connected */
     for (i = 0; i < n_highways; i++) {
@@ -239,6 +234,8 @@ void boruvka_mst() {
           n_city_components--;
           n_highways_used++;
         }
+
+        cities[i].cheapest = NULL;
       }
     }
 
@@ -248,6 +245,7 @@ void boruvka_mst() {
       return;
     }
     previous_city_components = n_city_components;
+    
   }
 
   /* Algorithm finished and all cities are connected */
