@@ -35,10 +35,20 @@ t4:
 	@./bin/main < ./tests/T04/input.txt > ./tests/T04/my_result.txt
 	@diff ./tests/T04/output.txt ./tests/T04/my_result.txt
 
+# Runs main against test 5
+t5:
+	@./bin/main < ./tests/T05/input.txt > ./tests/T05/my_result.txt
+	@diff ./tests/T05/output.txt ./tests/T05/my_result.txt
+
+# Runs main against test 6
+t6:
+	@./bin/main < ./tests/T06/input.txt > ./tests/T06/my_result.txt
+	@diff ./tests/T06/output.txt ./tests/T06/my_result.txt
+
 # Runs valgrind instance
 valgrind:
 	@docker run --platform linux/amd64 -tiv "$(PWD)/.:/valgrind" karek/valgrind:latest
 
 # Cleans binaries
 clean:
-	rm -rf ./bin/*
+	@rm -rf ./bin/*

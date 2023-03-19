@@ -115,6 +115,18 @@ void build_highway(int city_1, int city_2, int cost, Highway h) {
 }
 
 /**
+ * @brief Used in qsort to sort all highways.
+ * 
+ * @param h1 highway 1
+ * @param h2 highway 2
+ * 
+ * @return int 1 if left is less or -1 if not
+ */
+int highway_compare(const Highway h1, const Highway h2) {
+  return h1->cost >= h2->cost ? 1 : -1;
+}
+
+/**
  * @brief Frees all the allocated memory in all nodes.
  */
 void free_program_memory() {
@@ -183,7 +195,8 @@ void boruvka_mst() {
   int 
     i = 0, 
     previous_city_components = n_cities, 
-    n_city_components = n_cities - n_ports + 1, 
+    n_city_components = n_cities - n_ports + 1,
+    n_highways_found_in_loop = 0,  /* Used to stop the loop of finding highways earlier */
     n_highways_used = 0;
 
   /* While cities are not totally connected, we need to find the cheapest highways to connect them */
@@ -191,7 +204,7 @@ void boruvka_mst() {
 
     /* Loops over all possible highways that can be built to connect the city and chooses the cheapest
      * for each of the city components that are not yet connected */
-    for (i = 0; i < n_highways; i++) {
+    for (i = 0, n_highways_found_in_loop = 0; i < n_highways && n_highways_found_in_loop < n_city_components - 1; i++) {
       Highway h = &highways[i];
 
       /* Gets parents of both cities associated with this highway */
@@ -206,6 +219,7 @@ void boruvka_mst() {
         if (c2->cheapest == NULL || c2->cheapest->cost < h->cost) {
           c2->cheapest = h;
         }
+        n_highways_found_in_loop++;
       }
 
     }
@@ -282,6 +296,9 @@ void build_cities() {
     scanf("%d %d %d", &city_1, &city_2, &cost);
     build_highway(city_1, city_2, cost, &highways[i]);
   }
+
+  /* Sorts highways to make it faster to loop for them */
+  qsort(highways, n_highways, sizeof(struct highway), (int (*) (const void *, const void *)) &highway_compare);
 }
 
 /**
