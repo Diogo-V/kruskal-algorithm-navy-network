@@ -6,45 +6,17 @@
 
 
 /**
- * @brief Tells us the current state of the highway.
- * 
- * @param PENDING is still waiting to be selected 
- * @param PLANNED has been selected but has not yet been approved
- * @param BUILT was built and commit
- */
-typedef enum build_status {
-  PENDING,
-  PLANNED,
-  BUILT,
-} BuildStatus;
-
-/**
- * @brief Graph node that contains connection to the other possible highways of this city.
- * 
- * @param id number that identifies the city
- * @param next next highway node in the list of possible highways
- * @param previous previous highway node in the list of possible highways
- */
-typedef struct node {
-  int id;
-  struct highway* next;
-  struct highway* previous;
-} *Node;
-
-/**
  * @brief Highway configuration that is going to be associated to a city and used
  * in a linked list.
  * 
  * @param city_1 city node whose holder can be connected to through a highway
  * @param city_2 other city node whose holder can be connected to through a highway
  * @param cost cost of building this highway
- * @param status signals us if the highway has been built or is still pending
  */
 typedef struct highway {
-  struct node city_1;
-  struct node city_2;
+  int city_1;
+  int city_2;
   int cost;
-  BuildStatus status;
 } *Highway;
 
 /**
@@ -59,7 +31,6 @@ typedef struct highway {
  * @param cheapest cheapest highway that can be built in the current iteration
  */
 typedef struct city {
-  struct highway* highways;
   int port_cost;
   int n_highways;
 
@@ -125,63 +96,11 @@ void debug_print_cities() {
     printf("City %d: port_cost %d | n_highways %d\n", i, cities[i].port_cost, cities[i].n_highways);
   }
   for (k = 0; k < n_highways; k++) {
-    printf("Highway %d: c1 %d | c2 %d | cost %d | status %d\n", k,
-      highways[k].city_1.id, highways[k].city_2.id, highways[k].cost, highways[k].status);
+    printf("Highway %d: c1 %d | c2 %d | cost %d\n", k,
+      highways[k].city_1, highways[k].city_2, highways[k].cost);
   }
 }
 
-/**
- * @brief Get the city highway linked list node object.
- * 
- * @param city city that holds this highway
- * @param highway highway that can be built in this city
- * 
- * @return Node linked list node that keeps track of all highways in this city
- */
-Node get_city_highway_node(City city, Highway highway) {
-  int city_index = ptr_to_loc(city);
-  if (city_index == highway->city_1.id) {
-    return &highway->city_1;
-  } else {
-    return &highway->city_2;
-  }
-}
-
-/**
- * @brief Inserts a new highway in this city's linked list.
- * 
- * @param city city id that is going to holds this highway
- * @param highway highway reference
- */
-void insert_highway(City city, Highway highway) {
-  Node node = get_city_highway_node(city, highway);
-
-  /* If this is the first highway being added, we just need to update all pointers */
-  if (city->n_highways == 0) {
-    city->highways = highway;
-    node->next = NULL;
-    node->previous = NULL;
-    return;
-  }
-
-  /* When we only have one highway, we should just connect both */
-  Node city_node = get_city_highway_node(city, city->highways);
-  if (city->n_highways == 1) {
-    city_node->next = highway;
-    city_node->previous = highway;
-    node->next = city->highways;
-    node->previous = city->highways;
-    return;
-  }
-
-  /* Since it is not the first highway that has been added to this city, we have to append it */
-  Node last_node = get_city_highway_node(city, city_node->previous);
-
-  node->next = city->highways;
-  node->previous = city_node->previous;
-  last_node->next = highway;
-  city_node->previous = highway;
-}
 
 /**
  * @brief Creates highway reference and links it to both cities.
@@ -193,12 +112,8 @@ void insert_highway(City city, Highway highway) {
  */
 void build_highway(int city_1, int city_2, int cost, Highway h) {
   /* Saves cities identifiers*/
-  h->city_1.id = city_1;
-  h->city_2.id = city_2;
-
-  /* Inserts highway in both cities's linked list of highways */
-  insert_highway(&cities[city_1], h);
-  insert_highway(&cities[city_2], h);
+  h->city_1 = city_1;
+  h->city_2 = city_2;
 
   /* Updates number of highways that can be built in both cities */
   cities[city_1].n_highways++;
@@ -206,7 +121,6 @@ void build_highway(int city_1, int city_2, int cost, Highway h) {
 
   /* Updates highway cost */
   h->cost = cost;
-  h->status = PENDING;
 }
 
 /**
@@ -295,8 +209,8 @@ void boruvka_mst() {
       Highway h = &highways[i];
 
       /* Gets parents of both cities associated with this highway */
-      City c1 = find(&cities[h->city_1.id]);
-      City c2 = find(&cities[h->city_2.id]);
+      City c1 = find(&cities[h->city_1]);
+      City c2 = find(&cities[h->city_2]);
 
       /* If they are from different city components, we should try to update their cheapest edges */
       if (!cities_are_connected(c1, c2)) {
@@ -315,8 +229,8 @@ void boruvka_mst() {
       if (cities[i].cheapest != NULL) {
 
         /* Find capital city of the cities in this highway */
-        City c1 = find(&cities[cities[i].cheapest->city_1.id]);
-        City c2 = find(&cities[cities[i].cheapest->city_2.id]);
+        City c1 = find(&cities[cities[i].cheapest->city_1]);
+        City c2 = find(&cities[cities[i].cheapest->city_2]);
 
         /* If cities are not in the same component, unites them into a single one */
         if (!cities_are_connected(c1, c2)) {
