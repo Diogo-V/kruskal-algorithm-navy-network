@@ -22,18 +22,13 @@ typedef struct highway {
 /**
  * @brief City configuration that can be turned into a graph.
  * 
- * @param highways linked list of highways that can be built
  * @param port_cost cost of building a port (0 if no port can be built)
- * @param n_highways number of highways that can be built to this city
- * 
  * @param capital parent city that is the parent of this one in the MST sub-trees
  * @param n_connected_cities number of connected cities in the MST sub-tree
  * @param cheapest cheapest highway that can be built in the current iteration
  */
 typedef struct city {
   int port_cost;
-  int n_highways;
-
   struct city* capital;
   int n_connected_cities;
   struct highway* cheapest;
@@ -93,7 +88,7 @@ int ptr_to_loc(City city) {
 void debug_print_cities() {
   int i, k;
   for (i = 1; i < n_cities + 1; i++) {
-    printf("City %d: port_cost %d | n_highways %d\n", i, cities[i].port_cost, cities[i].n_highways);
+    printf("City %d: port_cost %d\n", i, cities[i].port_cost);
   }
   for (k = 0; k < n_highways; k++) {
     printf("Highway %d: c1 %d | c2 %d | cost %d\n", k,
@@ -114,10 +109,6 @@ void build_highway(int city_1, int city_2, int cost, Highway h) {
   /* Saves cities identifiers*/
   h->city_1 = city_1;
   h->city_2 = city_2;
-
-  /* Updates number of highways that can be built in both cities */
-  cities[city_1].n_highways++;
-  cities[city_2].n_highways++;
 
   /* Updates highway cost */
   h->cost = cost;
@@ -245,7 +236,7 @@ void boruvka_mst() {
       return;
     }
     previous_city_components = n_city_components;
-    
+
   }
 
   /* Algorithm finished and all cities are connected */
