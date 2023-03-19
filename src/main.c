@@ -2,16 +2,6 @@
 #include "stdio.h"
 
 
-#define MAX_VERTICES 10000
-typedef struct Edge {
-    int src, dest, weight;
-} Edge;
-
-typedef struct Graph {
-    int num_vertices;
-    Edge edges[MAX_VERTICES];
-} Graph;
-
 /* ################################ Globals ################################ */
 
 
@@ -63,11 +53,19 @@ typedef struct highway {
  * @param highways linked list of highways that can be built
  * @param port_cost cost of building a port (0 if no port can be built)
  * @param n_highways number of highways that can be built to this city
+ * 
+ * @param capital parent city that is the parent of this one in the MST sub-trees
+ * @param n_connected_cities number of connected cities in the MST sub-tree
+ * @param cheapest cheapest highway that can be built in the current iteration
  */
 typedef struct city {
   struct highway* highways;
   int port_cost;
   int n_highways;
+
+  struct city* capital;
+  int n_connected_cities;
+  struct highway* cheapest;
 } *City;
 
 /**
@@ -95,7 +93,10 @@ City cities;
  */
 Highway highways;
 
-
+/**
+ * @brief Holds the total cost that has to be paid for the current city plan.
+ */
+int total_plan_cost = 0;
 
 
 /* ################################ Helpers ################################ */
@@ -221,40 +222,49 @@ void free_program_memory() {
 
 
 /**
- * @brief Finds the parent of a node in a disjoint set.
+ * @brief Checks if these two cities are not in the same sub-tree.
  * 
- * @param parent list of parents to look for
- * @param i node to which we want to find the parent
+ * @param c1 one of the cities to check
+ * @param c2 other city to check
  * 
- * @return int id of the parent of i node
+ * @return int 0 if false and 1 if true
  */
-int find(int parent[], int i) {
-  int node_parent = i;
-  while (parent[node_parent] != node_parent) {  // Stops when i is the parent of itself
-    node_parent = parent[node_parent];
+int cities_are_connected(City c1, City c2) {
+  return c1 == c2 || (c1->port_cost != 0 && c2->port_cost != 0);
+}
+
+/**
+ * @brief Finds the capital city of another child city in a disjoint set.
+ * 
+ * @param city city to look for the capital
+ * 
+ * @return City parent city of this child
+ */
+City find(City child) {
+  City parent = child;
+  while (parent->capital != NULL) {
+    parent = child->capital;
   }
-  return node_parent;
+  return parent;
 }
 
 /**
  * @brief Perform a union of two disjoint sets. Attaches the smaller rank tree under the root of the higher rank tree
  * 
- * @param parent list of parents 
- * @param rank list of node ranks (number of nodes in tree)
- * @param x element to fuse
- * @param y element to fuse
+ * @param x one of the cities to fuse into a single component
+ * @param y another city to fuse into a single connected graph
  */
-void union_set(int parent[], int rank[], int x, int y) {
-  int x_root = find(parent, x);
-  int y_root = find(parent, y);
+void union_set(City x, City y) {
+  City x_root = find(x);
+  City y_root = find(y);
 
-  if (rank[x_root] < rank[y_root]) {
-    parent[x_root] = y_root;
-  } else if (rank[x_root] > rank[y_root]) {
-    parent[y_root] = x_root;
+  if (x_root->n_connected_cities < y_root->n_connected_cities) {
+    x_root->capital = y_root;
+  } else if (x_root->n_connected_cities > y_root->n_connected_cities) {
+    y_root->capital = x_root;
   } else {
-    parent[y_root] = x_root;
-    rank[x_root]++;
+    y_root->capital = x_root;
+    x_root->n_connected_cities++;
   }
 }
 
@@ -263,75 +273,71 @@ void union_set(int parent[], int rank[], int x, int y) {
  * spanning tree. Sources for it are:
  * https://www.geeksforgeeks.org/boruvkas-algorithm-greedy-algo-9/
  * https://en.wikipedia.org/wiki/Bor%C5%AFvka%27s_algorithm
- * 
- * @param graph 
  */
-void boruvka_mst(Graph* graph) {
-  int parent[MAX_VERTICES];
-  int rank[MAX_VERTICES];
-  int cheapest[MAX_VERTICES];
-
-  for (int i = 0; i < graph->num_vertices; i++) {
-    parent[i] = i;
-    rank[i] = 0;
-    cheapest[i] = -1;
-  }
-
-  int num_trees = graph->num_vertices;
-  int total_weight = 0;
+void boruvka_mst() {
+  int 
+    i = 0, 
+    previous_city_components = n_cities, 
+    n_city_components = n_cities - n_ports + 1, 
+    n_highways_used = 0;
 
   /* While cities are not totally connected, we need to find the cheapest highways to connect them */
-  while (num_trees > 1) {
+  while (n_city_components > 1) {
 
     /* Resets all highways to be -1 */
-    for (int i = 0; i < graph->num_vertices; i++) {
-      cheapest[i] = -1;
+    for (i = 0; i < n_cities; i++) {
+      cities[i].cheapest = NULL;
     }
 
     /* Loops over all possible highways that can be built to connect the city and chooses the cheapest
      * for each of the city components that are not yet connected */
-    for (int i = 0; i < graph->num_vertices; i++) {
-      int current_parent = find(parent, i);
+    for (i = 0; i < n_highways; i++) {
+      Highway h = &highways[i];
 
-      for (int j = 0; j < graph->num_vertices; j++) {
-        // If the current node and the node being checked are not in the same component, we have to analyze it
-        if (find(parent, j) != current_parent) {
-          
-          // Calculate the index of the current edge
-          int edge_index = i * graph->num_vertices + j;
+      /* Gets parents of both cities associated with this highway */
+      City c1 = find(&cities[h->city_1.id]);
+      City c2 = find(&cities[h->city_2.id]);
 
-          // If the current edge has a lower weight than the cheapest edge for the component,
-          // update the cheapest edge
-          if (graph->edges[edge_index].weight < cheapest[current_parent] || cheapest[current_parent] == -1) {
-            cheapest[current_parent] = graph->edges[edge_index].weight;
-          }
-
+      /* If they are from different city components, we should try to update their cheapest edges */
+      if (!cities_are_connected(c1, c2)) {
+        if (c1->cheapest == NULL || c1->cheapest->cost < h->cost) {
+          c1->cheapest = h;
+        }
+        if (c2->cheapest == NULL || c2->cheapest->cost < h->cost) {
+          c2->cheapest = h;
         }
       }
-      
+
     }
 
-    // Traverse all edges and merge components with cheapest edges
-    for (int i = 0; i < graph->num_vertices; i++) {
+    /* Traverses all cities and build cheapest highways associated */
+    for (i = 0; i < n_cities; i++) {
+      if (cities[i].cheapest != NULL) {
 
-      // If there is no cheapest edge for this component, it is already merged
-      if (cheapest[i] != -1) {
+        /* Find capital city of the cities in this highway */
+        City c1 = find(&cities[cities[i].cheapest->city_1.id]);
+        City c2 = find(&cities[cities[i].cheapest->city_2.id]);
 
-        // Find the parent of the source and destination nodes
-        int current_parent = find(parent, graph->edges[i].src);
-        int dest_parent = find(parent, graph->edges[i].dest);
-
-        // If the source and destination nodes are not in the same component, merges the two components and reduce the number of trees by 1
-        if (current_parent != dest_parent) {
-          total_weight += graph->edges[i].weight;
-          union_set(parent, rank, current_parent, dest_parent);
-          num_trees--;
+        /* If cities are not in the same component, unites them into a single one */
+        if (!cities_are_connected(c1, c2)) {
+          total_plan_cost += cities[i].cheapest->cost;
+          union_set(c1, c2);
+          n_city_components--;
+          n_highways_used++;
         }
       }
     }
+
+    /* Nothing changed and so, it has finished without connecting all cities */
+    if (previous_city_components == n_city_components) {
+      printf("Impossible\n");
+      return;
+    }
+    previous_city_components = n_city_components;
   }
 
-  printf("Total weight of MST: %d\n", total_weight);
+  /* Algorithm finished and all cities are connected */
+  printf("%d\n%d %d\n", total_plan_cost, n_ports, n_highways_used);
 
 }
 
@@ -349,11 +355,19 @@ void build_cities() {
   scanf("%d", &n_cities);
   cities = (City) calloc(n_cities + 1, sizeof(struct city));
 
+  /* Each city will start off by being connected to itself and having only one connection */
+  for (i = 0; i < n_cities; i++) {
+    cities[i].capital = NULL;
+    cities[i].cheapest = NULL;
+    cities[i].n_connected_cities = 1;
+  }
+
   /* Builds ports using the configuration from standard in */
   scanf("%d", &n_ports);
   for (i = 0; i < n_ports; i++) {
     scanf("%d %d", &city_1, &cost);
     cities[city_1].port_cost = cost;
+    total_plan_cost += cost;
   }
 
   /* Reads max number of highways that can be built and builds struct for it */
@@ -369,17 +383,11 @@ void build_cities() {
 
 /**
  * @brief Uses the previously built city and plans the connections between the cities
- * using the ports and the highways.
+ * using the ports and the highways and computes the total city cost and counting the 
+ * number of ports and highways built.
  */
-void plan_city() {
-  // empty
-}
-
-/**
- * @brief Computes the total city cost and counts the number of ports and highways built.
- */
-void compute_city_plan_cost() {
-  // empty
+void compute_city_plan() {
+  boruvka_mst();
 }
 
 /**
@@ -392,13 +400,8 @@ int main() {
   /* Builds cities configuration */
   build_cities();
 
-  debug_print_cities();
-
-  /* Creates the minimum spanning tree of this city */
-  plan_city();
-
-  /* Computes the cost of the city plan */
-  compute_city_plan_cost();
+  /* Computes the minimum spanning tree plan of this city and its cost */
+  compute_city_plan();
 
   /* Cleans up the program by freeing all the allocated memory */
   free_program_memory();
