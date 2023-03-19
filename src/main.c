@@ -2,6 +2,16 @@
 #include "stdio.h"
 
 
+#define MAX_VERTICES 10000
+typedef struct Edge {
+    int src, dest, weight;
+} Edge;
+
+typedef struct Graph {
+    int num_vertices;
+    Edge edges[MAX_VERTICES];
+} Graph;
+
 /* ################################ Globals ################################ */
 
 
@@ -84,6 +94,8 @@ City cities;
  * @brief Holds highways that can be built in this city.
  */
 Highway highways;
+
+
 
 
 /* ################################ Helpers ################################ */
@@ -202,6 +214,125 @@ void build_highway(int city_1, int city_2, int cost, Highway h) {
 void free_program_memory() {
   free(cities);
   free(highways);
+}
+
+
+/* ############################# MST Algorithm ############################# */
+
+
+/**
+ * @brief Finds the parent of a node in a disjoint set.
+ * 
+ * @param parent list of parents to look for
+ * @param i node to which we want to find the parent
+ * 
+ * @return int id of the parent of i node
+ */
+int find(int parent[], int i) {
+  int node_parent = i;
+  while (parent[node_parent] != node_parent) {  // Stops when i is the parent of itself
+    node_parent = parent[node_parent];
+  }
+  return node_parent;
+}
+
+/**
+ * @brief Perform a union of two disjoint sets. Attaches the smaller rank tree under the root of the higher rank tree
+ * 
+ * @param parent list of parents 
+ * @param rank list of node ranks (number of nodes in tree)
+ * @param x element to fuse
+ * @param y element to fuse
+ */
+void union_set(int parent[], int rank[], int x, int y) {
+  int x_root = find(parent, x);
+  int y_root = find(parent, y);
+
+  if (rank[x_root] < rank[y_root]) {
+    parent[x_root] = y_root;
+  } else if (rank[x_root] > rank[y_root]) {
+    parent[y_root] = x_root;
+  } else {
+    parent[y_root] = x_root;
+    rank[x_root]++;
+  }
+}
+
+/**
+ * @brief Implementation of the boruvka algorithm to compute a minimum
+ * spanning tree. Sources for it are:
+ * https://www.geeksforgeeks.org/boruvkas-algorithm-greedy-algo-9/
+ * https://en.wikipedia.org/wiki/Bor%C5%AFvka%27s_algorithm
+ * 
+ * @param graph 
+ */
+void boruvka_mst(Graph* graph) {
+  int parent[MAX_VERTICES];
+  int rank[MAX_VERTICES];
+  int cheapest[MAX_VERTICES];
+
+  for (int i = 0; i < graph->num_vertices; i++) {
+    parent[i] = i;
+    rank[i] = 0;
+    cheapest[i] = -1;
+  }
+
+  int num_trees = graph->num_vertices;
+  int total_weight = 0;
+
+  /* While cities are not totally connected, we need to find the cheapest highways to connect them */
+  while (num_trees > 1) {
+
+    /* Resets all highways to be -1 */
+    for (int i = 0; i < graph->num_vertices; i++) {
+      cheapest[i] = -1;
+    }
+
+    /* Loops over all possible highways that can be built to connect the city and chooses the cheapest
+     * for each of the city components that are not yet connected */
+    for (int i = 0; i < graph->num_vertices; i++) {
+      int current_parent = find(parent, i);
+
+      for (int j = 0; j < graph->num_vertices; j++) {
+        // If the current node and the node being checked are not in the same component, we have to analyze it
+        if (find(parent, j) != current_parent) {
+          
+          // Calculate the index of the current edge
+          int edge_index = i * graph->num_vertices + j;
+
+          // If the current edge has a lower weight than the cheapest edge for the component,
+          // update the cheapest edge
+          if (graph->edges[edge_index].weight < cheapest[current_parent] || cheapest[current_parent] == -1) {
+            cheapest[current_parent] = graph->edges[edge_index].weight;
+          }
+
+        }
+      }
+      
+    }
+
+    // Traverse all edges and merge components with cheapest edges
+    for (int i = 0; i < graph->num_vertices; i++) {
+
+      // If there is no cheapest edge for this component, it is already merged
+      if (cheapest[i] != -1) {
+
+        // Find the parent of the source and destination nodes
+        int current_parent = find(parent, graph->edges[i].src);
+        int dest_parent = find(parent, graph->edges[i].dest);
+
+        // If the source and destination nodes are not in the same component, merges the two components and reduce the number of trees by 1
+        if (current_parent != dest_parent) {
+          total_weight += graph->edges[i].weight;
+          union_set(parent, rank, current_parent, dest_parent);
+          num_trees--;
+        }
+      }
+    }
+  }
+
+  printf("Total weight of MST: %d\n", total_weight);
+
 }
 
 

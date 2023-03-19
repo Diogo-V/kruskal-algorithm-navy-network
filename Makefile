@@ -1,5 +1,5 @@
 compiler = gcc
-flags = -Wall -Wpedantic -Wextra -Werror=format-security -g -lm -O3
+flags = -Wall -std=c99 -Wpedantic -Wextra -Werror=format-security -g -lm -O3
 
 source_code = ./src/*.c
 
