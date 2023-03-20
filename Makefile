@@ -1,5 +1,5 @@
 compiler = gcc
-flags = -Wall -std=c99 -Wpedantic -Wextra -Werror=format-security -g -lm -O3
+flags = -Wall -D NDEBUG -std=c99 -Wpedantic -Wextra -Werror=format-security -g -lm -O3
 
 source_code = ./src/*.c
 
@@ -44,6 +44,27 @@ t5:
 t6:
 	@./bin/main < ./tests/T06/input.txt > ./tests/T06/my_result.txt
 	@diff ./tests/T06/output.txt ./tests/T06/my_result.txt
+
+# Runs main against test 7
+t7:
+	@./bin/main < ./tests/T07/input.txt > ./tests/T07/my_result.txt
+	@diff ./tests/T07/output.txt ./tests/T07/my_result.txt
+
+# Runs main against test 8
+t8:
+	@./bin/main < ./tests/T08/input.txt > ./tests/T08/my_result.txt
+	@diff ./tests/T08/output.txt ./tests/T08/my_result.txt
+
+# Runs all tests
+test: 
+	@make t1
+	@make t2
+	@make t3
+	@make t4
+	@make t5
+	@make t6
+	@make t7
+	@make t8
 
 # Runs valgrind instance
 valgrind:

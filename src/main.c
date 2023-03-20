@@ -22,12 +22,14 @@ typedef struct highway {
 /**
  * @brief City configuration that can be turned into a graph.
  * 
+ * @param id id of the city
  * @param port_cost cost of building a port (0 if no port can be built)
  * @param capital parent city that is the parent of this one in the MST sub-trees
  * @param n_connected_cities number of connected cities in the MST sub-tree
  * @param cheapest cheapest highway that can be built in the current iteration
  */
 typedef struct city {
+  int id;
   int port_cost;
   struct city* capital;
   int n_connected_cities;
@@ -81,21 +83,6 @@ int ptr_to_loc(City city) {
   if(NULL != city) r = ((size_t) city - (size_t) cities) / sizeof(struct city);
   return (int) r;
 }
-
-/**
- * @brief Helps to debug the building of the city graph.
- */
-void debug_print_cities() {
-  int i, k;
-  for (i = 1; i < n_cities + 1; i++) {
-    printf("City %d: port_cost %d\n", i, cities[i].port_cost);
-  }
-  for (k = 0; k < n_highways; k++) {
-    printf("Highway %d: c1 %d | c2 %d | cost %d\n", k,
-      highways[k].city_1, highways[k].city_2, highways[k].cost);
-  }
-}
-
 
 /**
  * @brief Creates highway reference and links it to both cities.
@@ -159,10 +146,13 @@ int cities_are_connected(City c1, City c2) {
  */
 City find(City child) {
   City parent = child;
-  while (parent->capital != NULL) {
+  while (parent->capital != parent) {
     parent = child->capital;
   }
   return parent;
+  /* if (child->capital == child)
+    return child;
+  return child->capital = find(child->capital); */
 }
 
 /**
@@ -185,17 +175,52 @@ void union_set(City x, City y) {
   }
 }
 
+void kruskalAlgo() {
+  int 
+    i = 0, 
+    n_components = n_cities - n_ports, 
+    n_highways_used = 0;
+
+  if (n_ports != 0) {
+    n_components++;
+  }
+
+  for (i = 0; i < n_highways; i++) {
+    Highway h = &highways[i];
+
+    City v1 = find(&cities[h->city_1]);
+    City v2 = find(&cities[h->city_2]);
+
+    if (!cities_are_connected(v1, v2)) {
+        union_set(v1, v2);
+        total_plan_cost += h->cost;
+        n_highways_used++;
+        n_components--;
+    }
+    
+  }
+
+  if (n_components > 1) {
+    printf("Impossible\n");
+    return;
+  }
+
+  /* Algorithm finished and all cities are connected */
+  printf("%d\n%d %d\n", total_plan_cost, n_ports, n_highways_used);
+}
+
 /**
  * @brief Implementation of the boruvka algorithm to compute a minimum
  * spanning tree. Sources for it are:
  * https://www.geeksforgeeks.org/boruvkas-algorithm-greedy-algo-9/
  * https://en.wikipedia.org/wiki/Bor%C5%AFvka%27s_algorithm
+ * 
+ * @param n_city_components number of cities to be connected
  */
-void boruvka_mst() {
+void boruvka_mst(int n_city_components) {
   int 
     i = 0, 
     previous_city_components = n_cities, 
-    n_city_components = n_cities - n_ports + 1,
     n_highways_found_in_loop = 0,  /* Used to stop the loop of finding highways earlier */
     n_highways_used = 0;
 
@@ -213,10 +238,10 @@ void boruvka_mst() {
 
       /* If they are from different city components, we should try to update their cheapest edges */
       if (!cities_are_connected(c1, c2)) {
-        if (c1->cheapest == NULL || c1->cheapest->cost < h->cost) {
+        if (c1->cheapest == NULL || (c1->cheapest->cost <= h->cost && h->city_1 < c1->cheapest->city_1)) {
           c1->cheapest = h;
         }
-        if (c2->cheapest == NULL || c2->cheapest->cost < h->cost) {
+        if (c2->cheapest == NULL || (c2->cheapest->cost <= h->cost && h->city_1 < c2->cheapest->city_1)) {
           c2->cheapest = h;
         }
         n_highways_found_in_loop++;
@@ -269,18 +294,19 @@ void build_cities() {
   int i = 0, cost = 0, city_1 = 0, city_2 = 0;
 
   /* Reads number of cities and build structure for it */
-  scanf("%d", &n_cities);
+  scanf("%d\n", &n_cities);
   cities = (City) calloc(n_cities + 1, sizeof(struct city));
 
   /* Each city will start off by being connected to itself and having only one connection */
-  for (i = 0; i < n_cities; i++) {
-    cities[i].capital = NULL;
+  for (i = 1; i < n_cities + 1; i++) {
+    cities[i].capital = &cities[i];
     cities[i].cheapest = NULL;
     cities[i].n_connected_cities = 1;
+    cities[i].id = i + 1;
   }
 
   /* Builds ports using the configuration from standard in */
-  scanf("%d", &n_ports);
+  scanf("%d\n", &n_ports);
   for (i = 0; i < n_ports; i++) {
     scanf("%d %d", &city_1, &cost);
     cities[city_1].port_cost = cost;
@@ -288,12 +314,12 @@ void build_cities() {
   }
 
   /* Reads max number of highways that can be built and builds struct for it */
-  scanf("%d", &n_highways);
+  scanf("%d\n", &n_highways);
   highways = (Highway) calloc(n_highways, sizeof(struct highway));
 
   /* Inserts highways in the struct and connects them to the cities */
   for (i = 0, city_1 = 0; i < n_highways; i++) {
-    scanf("%d %d %d", &city_1, &city_2, &cost);
+    scanf("%d %d %d\n", &city_1, &city_2, &cost);
     build_highway(city_1, city_2, cost, &highways[i]);
   }
 
@@ -307,7 +333,16 @@ void build_cities() {
  * number of ports and highways built.
  */
 void compute_city_plan() {
-  boruvka_mst();
+  int n_city_components = n_cities - n_ports;
+
+  /* Fixes number of city components in the case that there is no ports */
+  if (n_ports != 0) {
+    n_city_components++;
+  }
+
+  boruvka_mst(n_city_components);
+
+  /* kruskalAlgo(); */
 }
 
 /**
