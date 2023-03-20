@@ -66,6 +66,11 @@ Highway highways;
  */
 int total_plan_cost = 0;
 
+/**
+ * @brief Holds reference to the first city with a port. Used to connect every port.
+ */
+City first_city_with_port = NULL;
+
 
 /* ################################ Helpers ################################ */
 
@@ -145,14 +150,14 @@ int cities_are_connected(City c1, City c2) {
  * @return City parent city of this child
  */
 City find(City child) {
-  City parent = child;
+  /* City parent = child;
   while (parent->capital != parent) {
     parent = child->capital;
   }
-  return parent;
-  /* if (child->capital == child)
+  return parent; */
+  if (child->capital == child)
     return child;
-  return child->capital = find(child->capital); */
+  return child->capital = find(child->capital);
 }
 
 /**
@@ -170,8 +175,13 @@ void union_set(City x, City y) {
   } else if (x_root->n_connected_cities > y_root->n_connected_cities) {
     y_root->capital = x_root;
   } else {
-    y_root->capital = x_root;
-    x_root->n_connected_cities++;
+    if (x_root->port_cost != 0) {
+      y_root->capital = x_root;
+      x_root->n_connected_cities++;
+    } else {
+      x_root->capital = y_root;
+      y_root->n_connected_cities++;
+    }
   }
 }
 
@@ -229,7 +239,7 @@ void boruvka_mst(int n_city_components) {
 
     /* Loops over all possible highways that can be built to connect the city and chooses the cheapest
      * for each of the city components that are not yet connected */
-    for (i = 0, n_highways_found_in_loop = 0; i < n_highways && n_highways_found_in_loop < n_city_components - 1; i++) {
+    for (i = 0, n_highways_found_in_loop = 0; i < n_highways && n_highways_found_in_loop < n_city_components; i++) {
       Highway h = &highways[i];
 
       /* Gets parents of both cities associated with this highway */
@@ -311,6 +321,7 @@ void build_cities() {
     scanf("%d %d", &city_1, &cost);
     cities[city_1].port_cost = cost;
     total_plan_cost += cost;
+    first_city_with_port = &cities[city_1];
   }
 
   /* Reads max number of highways that can be built and builds struct for it */
@@ -333,16 +344,23 @@ void build_cities() {
  * number of ports and highways built.
  */
 void compute_city_plan() {
-  int n_city_components = n_cities - n_ports;
+  int n_city_components = n_cities - n_ports, i = 0;
 
   /* Fixes number of city components in the case that there is no ports */
   if (n_ports != 0) {
     n_city_components++;
   }
 
-  boruvka_mst(n_city_components);
+  /* Pre connects all ports */
+  for (i = 0; i < n_cities && first_city_with_port != NULL; i++) {
+    if (cities[i].port_cost != 0) {
+      union_set(first_city_with_port, &cities[i]);
+    }
+  }
 
-  /* kruskalAlgo(); */
+  /* boruvka_mst(n_city_components); */
+
+  kruskalAlgo();
 }
 
 /**
