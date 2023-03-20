@@ -26,14 +26,12 @@ typedef struct highway {
  * @param port_cost cost of building a port (0 if no port can be built)
  * @param capital parent city that is the parent of this one in the MST sub-trees
  * @param n_connected_cities number of connected cities in the MST sub-tree
- * @param cheapest cheapest highway that can be built in the current iteration
  */
 typedef struct city {
   int id;
   int port_cost;
   struct city* capital;
   int n_connected_cities;
-  struct highway* cheapest;
 } *City;
 
 /**
@@ -150,14 +148,10 @@ int cities_are_connected(City c1, City c2) {
  * @return City parent city of this child
  */
 City find(City child) {
-  /* City parent = child;
-  while (parent->capital != parent) {
-    parent = child->capital;
-  }
-  return parent; */
   if (child->capital == child)
     return child;
-  return child->capital = find(child->capital);
+  child->capital = find(child->capital);
+  return child->capital;
 }
 
 /**
@@ -185,31 +179,40 @@ void union_set(City x, City y) {
   }
 }
 
-void kruskalAlgo() {
+/**
+ * @brief Implementation of the kruskal algorithm to compute a minimum
+ * spanning tree. Source:
+ * https://www.geeksforgeeks.org/kruskals-minimum-spanning-tree-algorithm-greedy-algo-2/
+ */
+void kruskal() {
   int 
     i = 0, 
     n_components = n_cities - n_ports, 
     n_highways_used = 0;
 
+  /* If we have ports, we have to add 1 to account for their connection */
   if (n_ports != 0) {
     n_components++;
   }
 
-  for (i = 0; i < n_highways; i++) {
+  /* Loops over all possible highways that can be built to connect the city and chooses the cheapest
+   * for each of the city components that are not yet connected */
+  for (i = 0; i < n_highways && n_components > 1; i++) {
     Highway h = &highways[i];
 
     City v1 = find(&cities[h->city_1]);
     City v2 = find(&cities[h->city_2]);
 
+    /* If they are from different city components, we should merge them together */
     if (!cities_are_connected(v1, v2)) {
-        union_set(v1, v2);
-        total_plan_cost += h->cost;
-        n_highways_used++;
-        n_components--;
+      total_plan_cost += h->cost;
+      n_highways_used++;
+      n_components--;
+      union_set(v1, v2);
     }
-    
   }
 
+  /* Nothing changed and so, it has finished without connecting all cities */
   if (n_components > 1) {
     printf("Impossible\n");
     return;
@@ -217,80 +220,6 @@ void kruskalAlgo() {
 
   /* Algorithm finished and all cities are connected */
   printf("%d\n%d %d\n", total_plan_cost, n_ports, n_highways_used);
-}
-
-/**
- * @brief Implementation of the boruvka algorithm to compute a minimum
- * spanning tree. Sources for it are:
- * https://www.geeksforgeeks.org/boruvkas-algorithm-greedy-algo-9/
- * https://en.wikipedia.org/wiki/Bor%C5%AFvka%27s_algorithm
- * 
- * @param n_city_components number of cities to be connected
- */
-void boruvka_mst(int n_city_components) {
-  int 
-    i = 0, 
-    previous_city_components = n_cities, 
-    n_highways_found_in_loop = 0,  /* Used to stop the loop of finding highways earlier */
-    n_highways_used = 0;
-
-  /* While cities are not totally connected, we need to find the cheapest highways to connect them */
-  while (n_city_components > 1) {
-
-    /* Loops over all possible highways that can be built to connect the city and chooses the cheapest
-     * for each of the city components that are not yet connected */
-    for (i = 0, n_highways_found_in_loop = 0; i < n_highways && n_highways_found_in_loop < n_city_components; i++) {
-      Highway h = &highways[i];
-
-      /* Gets parents of both cities associated with this highway */
-      City c1 = find(&cities[h->city_1]);
-      City c2 = find(&cities[h->city_2]);
-
-      /* If they are from different city components, we should try to update their cheapest edges */
-      if (!cities_are_connected(c1, c2)) {
-        if (c1->cheapest == NULL || (c1->cheapest->cost <= h->cost && h->city_1 < c1->cheapest->city_1)) {
-          c1->cheapest = h;
-        }
-        if (c2->cheapest == NULL || (c2->cheapest->cost <= h->cost && h->city_1 < c2->cheapest->city_1)) {
-          c2->cheapest = h;
-        }
-        n_highways_found_in_loop++;
-      }
-
-    }
-
-    /* Traverses all cities and build cheapest highways associated */
-    for (i = 0; i < n_cities; i++) {
-      if (cities[i].cheapest != NULL) {
-
-        /* Find capital city of the cities in this highway */
-        City c1 = find(&cities[cities[i].cheapest->city_1]);
-        City c2 = find(&cities[cities[i].cheapest->city_2]);
-
-        /* If cities are not in the same component, unites them into a single one */
-        if (!cities_are_connected(c1, c2)) {
-          total_plan_cost += cities[i].cheapest->cost;
-          union_set(c1, c2);
-          n_city_components--;
-          n_highways_used++;
-        }
-
-        cities[i].cheapest = NULL;
-      }
-    }
-
-    /* Nothing changed and so, it has finished without connecting all cities */
-    if (previous_city_components == n_city_components) {
-      printf("Impossible\n");
-      return;
-    }
-    previous_city_components = n_city_components;
-
-  }
-
-  /* Algorithm finished and all cities are connected */
-  printf("%d\n%d %d\n", total_plan_cost, n_ports, n_highways_used);
-
 }
 
 
@@ -310,7 +239,6 @@ void build_cities() {
   /* Each city will start off by being connected to itself and having only one connection */
   for (i = 1; i < n_cities + 1; i++) {
     cities[i].capital = &cities[i];
-    cities[i].cheapest = NULL;
     cities[i].n_connected_cities = 1;
     cities[i].id = i + 1;
   }
@@ -351,16 +279,15 @@ void compute_city_plan() {
     n_city_components++;
   }
 
-  /* Pre connects all ports */
+  /* Pre connects all ports to form a single component */
   for (i = 0; i < n_cities && first_city_with_port != NULL; i++) {
     if (cities[i].port_cost != 0) {
       union_set(first_city_with_port, &cities[i]);
     }
   }
 
-  /* boruvka_mst(n_city_components); */
-
-  kruskalAlgo();
+  /* Plans city with kruskal algorithm */
+  kruskal();
 }
 
 /**
