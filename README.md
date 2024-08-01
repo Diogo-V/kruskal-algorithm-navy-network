@@ -1,6 +1,6 @@
 # Description
 
-Advanced Algorithms course first project
+Advanced Algorithms course second project
 
 ## How to run
 
